@@ -1,0 +1,16 @@
+# svc- prefix: exeslim's hardening drop-in applies. No hardening here. See
+# /etc/systemd/system/svc-.service.d/50-hardening.conf: DynamicUser, read-only
+# system, TCP only (hence Postgres over 127.0.0.1), Restart=on-failure.
+
+[Unit]
+Description=Miniflux
+Wants=postgresql.service
+After=postgresql.service
+
+[Service]
+ExecStart=/usr/bin/miniflux
+# The package's config file, shared with `miniflux -config-file`.
+EnvironmentFile=/etc/miniflux.conf
+
+[Install]
+WantedBy=multi-user.target

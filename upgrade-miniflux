@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# upgrade-miniflux: install a Miniflux release .deb in place and restart it.
+#
+# Usage: sudo upgrade-miniflux [-b backup-path] <version>
+#   -b  pg_dump the database to backup-path first (custom format); if it is
+#       a directory, to miniflux.dump in it
+
+set -euo pipefail
+
+readonly CONF=/etc/miniflux.conf
+
+usage() {
+	echo "usage: ${0##*/} [-b backup-path] <version>" >&2
+	exit 2
+}
+
+die() {
+	echo "error: $*" >&2
+	exit 1
+}
+
+# Parse arguments.
+backup=""
+while getopts ":b:" opt; do
+	case $opt in
+		b) backup="$OPTARG" ;;
+		*) usage ;;
+	esac
+done
+shift $((OPTIND - 1))
+(($# == 1)) || usage
+
+version="$1"
+version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+[[ $version =~ $version_re ]] || die "version must look like 2.3.3, got: $version"
+
+((EUID == 0)) || die "run as root"
+
+# Migrations only run forward, so a downgrade would leave the old binary on a
+# newer schema.
+current="$(miniflux -version)" || die "cannot read the installed Miniflux version"
+dpkg --compare-versions "$version" gt "$current" ||
+	die "$version is not newer than the installed $current"
+
+# Back up the database.
+if [[ -n $backup ]]; then
+	[[ -d $backup ]] && backup="${backup%/}/miniflux.dump"
+	echo "backing up database to $backup"
+
+	# Dump beside the target so a failure leaves any previous backup intact.
+	if ! (umask 077 && runuser -u postgres -- pg_dump -Fc miniflux >"$backup.tmp"); then
+		rm -f -- "$backup.tmp"
+		die "backup failed; nothing upgraded"
+	fi
+	mv -- "$backup.tmp" "$backup"
+fi
+
+# Download the release.
+tmp_dir="$(mktemp -d)"
+readonly tmp_dir
+trap 'rm -rf -- "$tmp_dir"' EXIT
+
+deb="miniflux_${version}_$(dpkg --print-architecture).deb"
+curl -fsSLo "$tmp_dir/$deb" "https://github.com/miniflux/v2/releases/download/${version}/${deb}"
+
+# Install and restart. Keep our $CONF. The package only restarts
+# miniflux.service, which is disabled; svc-miniflux runs migrations
+# (RUN_MIGRATIONS=1) on restart.
+dpkg -i --force-confold "$tmp_dir/$deb"
+systemctl restart svc-miniflux
+
+# Wait for health. The unit is Type=simple, so restart returns before
+# migrations finish.
+for ((i = 0; i < 60; i++)); do
+	if miniflux -config-file "$CONF" -healthcheck auto >/dev/null 2>&1; then
+		echo "Miniflux $(miniflux -version) is up"
+		exit 0
+	fi
+	sleep 1
+done
+
+die "svc-miniflux is not healthy after 60s; see: journalctl -u svc-miniflux"
