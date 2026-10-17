@@ -17,10 +17,20 @@ RUN curl -fsSLo /tmp/miniflux.deb \
 	&& apt-get update \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 		postgresql-16 /tmp/miniflux.deb \
+		unattended-upgrades update-notifier-common \
 	&& apt-get clean \
 	&& rm -rf /var/lib/apt/lists/* /tmp/miniflux.deb \
 	# exeslim empties this after its last apt layer; keep it empty after ours.
 	&& : >/etc/machine-id
+
+# exeslim masks these; turn them back on, rebooting when an upgrade needs it.
+RUN systemctl unmask apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service \
+	&& systemctl enable apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service \
+	&& printf '%s\n' \
+		'APT::Periodic::Update-Package-Lists "1";' \
+		'APT::Periodic::Unattended-Upgrade "1";' >/etc/apt/apt.conf.d/20auto-upgrades \
+	&& echo 'Unattended-Upgrade::Automatic-Reboot "true";' >/etc/apt/apt.conf.d/52exeflux-reboot \
+	&& rm /etc/apt/apt.conf.d/docker-disable-periodic-update
 
 RUN sed -i '1i host miniflux miniflux 127.0.0.1/32 trust' /etc/postgresql/16/main/pg_hba.conf \
 	&& pg_ctlcluster 16 main start \

@@ -115,6 +115,13 @@ ssh "$VM.exe.xyz" 'sudo cat /root/miniflux.dump | sudo -u postgres pg_restore -e
 
 Bump the `Dockerfile` `ARG`s to match.
 
+Ubuntu security updates install daily via `unattended-upgrades`, which
+reboots the VM right after any upgrade that needs it. Check with:
+
+```sh
+ssh "$VM.exe.xyz" sudo cat /var/log/unattended-upgrades/unattended-upgrades.log
+```
+
 ## Build
 
 ```sh

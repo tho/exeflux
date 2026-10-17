@@ -70,8 +70,9 @@ jobs:
           sbom: false
 
       # machine-id must stay empty (present, or first boot presets units) after
-      # our apt layers, only svc-miniflux may be enabled, and it must still be
-      # covered by exeslim's svc- hardening drop-in (exposure <= 2.0).
+      # our apt layers, svc-miniflux (not miniflux) and unattended upgrades are
+      # enabled, and it must still be covered by exeslim's svc- hardening
+      # drop-in (exposure <= 2.0).
       - name: Check the image
         run: |
           docker run --rm exeflux:ci bash -euc '
@@ -79,6 +80,10 @@ jobs:
             [[ $(systemctl is-enabled miniflux.service) == disabled ]]
             systemctl is-enabled svc-miniflux.service
             [[ ${{ matrix.flavor }} != tailscale ]] || systemctl is-enabled tailscaled.service
+            systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service
+            apt-config dump | grep -qx "Unattended-Upgrade::Automatic-Reboot \"true\";"
+            ! apt-config dump | grep -q "^APT::Periodic::Enable \"0\";"
+            [[ -x /usr/share/update-notifier/notify-reboot-required ]]
             grep -qx RUN_MIGRATIONS=1 /etc/miniflux.conf
             systemd-analyze verify svc-miniflux.service
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
