@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# upgrade-miniflux: install a Miniflux release .deb in place and restart it.
+# upgrade-miniflux: stop Miniflux, flush its sessions, optionally back up the
+# database, install a release .deb in place and start it again.
 #
 # Usage: sudo upgrade-miniflux [-b backup-path] <version>
 #   -b  pg_dump the database to backup-path first (custom format); if it is
@@ -42,20 +43,7 @@ current="$(miniflux -version)" || die "cannot read the installed Miniflux versio
 dpkg --compare-versions "$version" gt "$current" ||
 	die "$version is not newer than the installed $current"
 
-# Back up the database.
-if [[ -n $backup ]]; then
-	[[ -d $backup ]] && backup="${backup%/}/miniflux.dump"
-	echo "backing up database to $backup"
-
-	# Dump beside the target so a failure leaves any previous backup intact.
-	if ! (umask 077 && runuser -u postgres -- pg_dump -Fc miniflux >"$backup.tmp"); then
-		rm -f -- "$backup.tmp"
-		die "backup failed; nothing upgraded"
-	fi
-	mv -- "$backup.tmp" "$backup"
-fi
-
-# Download the release.
+# Download the release first, so a failed download leaves Miniflux running.
 tmp_dir="$(mktemp -d)"
 readonly tmp_dir
 trap 'rm -rf -- "$tmp_dir"' EXIT
@@ -63,11 +51,34 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 deb="miniflux_${version}_$(dpkg --print-architecture).deb"
 curl -fsSLo "$tmp_dir/$deb" "https://github.com/miniflux/v2/releases/download/${version}/${deb}"
 
-# Install and restart. Keep our $CONF. The package only restarts
+# Stop, then flush sessions, per https://miniflux.app/docs/upgrade.html.
+# Stopping first means no writes land after the backup and no session is
+# created after the flush.
+systemctl stop svc-miniflux
+miniflux -config-file "$CONF" -flush-sessions
+
+# Back up the database.
+if [[ -n $backup ]]; then
+	[[ -d $backup ]] && backup="${backup%/}/miniflux.dump"
+	echo "backing up database to $backup"
+
+	# Dump beside the target so a failure leaves any previous backup intact.
+	# Restoring to /dev/null reads every entry, so a truncated or corrupt dump
+	# fails here rather than at restore time (pg_restore -l would not notice).
+	if ! (umask 077 && runuser -u postgres -- pg_dump -Fc miniflux >"$backup.tmp") ||
+		! pg_restore -f /dev/null "$backup.tmp"; then
+		rm -f -- "$backup.tmp"
+		systemctl start svc-miniflux
+		die "backup failed; nothing upgraded"
+	fi
+	mv -- "$backup.tmp" "$backup"
+fi
+
+# Install and start. Keep our $CONF. The package only restarts
 # miniflux.service, which is disabled; svc-miniflux runs migrations
-# (RUN_MIGRATIONS=1) on restart.
+# (RUN_MIGRATIONS=1) on start.
 dpkg -i --force-confold "$tmp_dir/$deb"
-systemctl restart svc-miniflux
+systemctl start svc-miniflux
 
 # Wait for health. The unit is Type=simple, so restart returns before
 # migrations finish.

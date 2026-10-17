@@ -104,10 +104,14 @@ ssh "$VM.exe.xyz" sudo -u postgres psql miniflux \
 ssh "$VM.exe.xyz" sudo upgrade-miniflux -b /root/miniflux.dump <version>
 ```
 
-Refuses downgrades, keeps `/etc/miniflux.conf`, waits 60s for health. No
-rollback: on failure check `journalctl -u svc-miniflux`; to revert,
-`dpkg -i --force-confold` the old `.deb`, then follow the restore steps in
-Backup and restore, replacing its `pg_restore` line with:
+Read the [release notes](https://github.com/miniflux/v2/releases) for breaking
+changes first. Follows [upstream's steps](https://miniflux.app/docs/upgrade.html):
+stops `svc-miniflux`, flushes sessions (proxy auth signs users back in on their
+next request), dumps and checks the backup if `-b`, installs, starts.  Refuses
+downgrades, keeps `/etc/miniflux.conf`, waits 60s for health. No rollback: on
+failure check `journalctl -u svc-miniflux`; to revert, `dpkg -i --force-confold`
+the old `.deb`, then follow the restore steps in Backup and restore, replacing
+its `pg_restore` line with:
 
 ```sh
 ssh "$VM.exe.xyz" 'sudo cat /root/miniflux.dump | sudo -u postgres pg_restore -e -d miniflux'
