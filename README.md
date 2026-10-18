@@ -37,7 +37,7 @@ ssh "$VM.exe.xyz" sudo -u postgres psql miniflux \
 Set `BASE_URL` for API clients and media-proxy links:
 
 ```sh
-ssh "$VM.exe.xyz" 'echo BASE_URL=<url> | sudo tee -a /etc/miniflux.conf'
+ssh "$VM.exe.xyz" 'echo BASE_URL=<proto>://<url> | sudo tee -a /etc/miniflux.conf'
 ssh "$VM.exe.xyz" sudo systemctl restart svc-miniflux
 ```
 
