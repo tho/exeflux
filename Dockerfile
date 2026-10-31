@@ -4,7 +4,7 @@
 #   docker build --target tailscale -t exeflux:tailscale .
 
 # Immutable <date>.<run>.<attempt> tag; exeslim's <date> tag moves.
-ARG BASE=ghcr.io/tho/exeslim:2026-10-16.8.1
+ARG BASE=ghcr.io/tho/exeslim:2026-10-31.16.1
 FROM ${BASE} AS common
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 

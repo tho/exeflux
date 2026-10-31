@@ -69,14 +69,15 @@ jobs:
           provenance: false
           sbom: false
 
-      # machine-id must stay empty (present, or first boot presets units) after
-      # our apt layers, svc-miniflux (not miniflux) and unattended upgrades are
-      # enabled, and it must still be covered by exeslim's svc- hardening
-      # drop-in (exposure <= 2.0).
+      # machine-id must stay empty (present, or first boot presets units) and
+      # dbus's must still be the symlink to it, after our apt layers;
+      # svc-miniflux (not miniflux) and unattended upgrades are enabled, and
+      # svc-miniflux must still be covered by exeslim's svc- hardening drop-in
+      # (exposure <= 2.0, where a unit the drop-in misses scores ~9.4).
       - name: Check the image
         run: |
           docker run --rm exeflux:ci bash -euc '
-            [[ -f /etc/machine-id && ! -s /etc/machine-id ]]
+            [[ -f /etc/machine-id && ! -s /etc/machine-id && $(readlink /var/lib/dbus/machine-id) == /etc/machine-id ]]
             [[ $(systemctl is-enabled miniflux.service) == disabled ]]
             systemctl is-enabled svc-miniflux.service
             [[ ${{ matrix.flavor }} != tailscale ]] || systemctl is-enabled tailscaled.service
@@ -89,14 +90,21 @@ jobs:
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
             ! upgrade-miniflux "$(miniflux -version)"'
 
-      # Boot it: Postgres up, svc-miniflux migrated and answering under the
-      # effective hardening. Same recipe as exeslim's own CI.
+      # Boot it: after boot only the unit Docker cannot run may have failed,
+      # the running svc-miniflux must carry exeslim's hardening drop-in, and
+      # it must have migrated and answer. Same recipe as exeslim's own CI.
       - name: Boot the image
         run: |
+          set -euo pipefail
           docker run -d --name mf --privileged --tmpfs /run --tmpfs /run/lock exeflux:ci
           # "degraded" is expected: systemd-growfs-root fails in Docker.
           timeout 120 bash -c 'until [[ $(docker exec mf systemctl is-system-running 2>/dev/null) =~ ^(running|degraded)$ ]]; do sleep 1; done'
-          docker exec mf svc-check svc-miniflux.service
+          failed=$(docker exec mf systemctl --failed --plain --no-legend | awk '{print $1}')
+          [[ -z $failed || $failed == systemd-growfs-root.service ]] ||
+            { echo "unexpected failed units: $failed"; exit 1; }
+          dropins=$(docker exec mf systemctl show --property=DropInPaths --value svc-miniflux.service)
+          [[ " $dropins " == *" /etc/systemd/system/svc-.service.d/50-hardening.conf "* ]] ||
+            { echo "svc-miniflux runs without exeslim's hardening drop-in: $dropins"; exit 1; }
           timeout 60 bash -c 'until docker exec mf miniflux -config-file /etc/miniflux.conf -healthcheck auto; do sleep 1; done'
 
       - if: failure()
