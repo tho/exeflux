@@ -17,10 +17,9 @@ authentication.
 ## Deploy
 
 Tags are `<build-id>-<flavor>` for `exe` and `tailscale`
-([package page](https://github.com/tho/exeflux/pkgs/container/exeflux));
-`latest-<flavor>`, `<date>-<flavor>` and `<sha>-<flavor>` move, as
-[exeslim](https://github.com/tho/exeslim#tags)'s `:latest`, `:<date>` and
-`:<sha>` do.
+([package page](https://github.com/tho/exeflux/pkgs/container/exeflux)).
+`latest-<flavor>` moves and exe.dev caches it for up to an hour
+([exeslim: tags](https://github.com/tho/exeslim#tags)).
 
 ```sh
 ssh exe.dev new --name="$VM" --image=ghcr.io/tho/exeflux:<build-id>-<flavor>

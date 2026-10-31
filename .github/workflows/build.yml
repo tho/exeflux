@@ -54,7 +54,6 @@ jobs:
         run: |
           now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           {
-            echo "date=${now%%T*}"
             echo "build=${now%%T*}.${{ github.run_number }}.${{ github.run_attempt }}"
             echo "created=$now"
           } >> "$GITHUB_OUTPUT"
@@ -142,13 +141,12 @@ jobs:
             org.opencontainers.image.version=${{ steps.tag.outputs.build }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.tag.outputs.created }}
-          # Moving:    latest-, <date>-, <sha>-<flavor>
-          # Immutable: <date>.<run_number>.<run_attempt>-<flavor>
+          # latest-<flavor> moves; <build-id>-<flavor> is immutable. No <date>
+          # or <sha> tags, as in exeslim: they would move while looking like
+          # pins. The commit is in the revision label.
           tags: |
             ghcr.io/${{ github.repository }}:latest-${{ matrix.flavor }}
-            ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.date }}-${{ matrix.flavor }}
             ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.build }}-${{ matrix.flavor }}
-            ghcr.io/${{ github.repository }}:${{ github.sha }}-${{ matrix.flavor }}
           # exe.dev reads image metadata directly; attestations would wrap it
           # in a manifest list.
           provenance: false
