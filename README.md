@@ -5,7 +5,7 @@
 
 | Flavor      | Listens on                    | Reached via            | Auth header            |
 |-------------|-------------------------------|------------------------|------------------------|
-| `exe`       | `127.0.0.1:8000`              | `https://$VM.exe.xyz/` | `X-ExeDev-Email`       |
+| `exe`       | `127.0.0.1:8000`              | `https://$VM.exe.xyz`  | `X-ExeDev-Email`       |
 | `tailscale` | `/run/miniflux/miniflux.sock` | Tailscale Serve        | `Tailscale-User-Login` |
 
 Users are created on first visit from the header; password login is disabled.
@@ -49,7 +49,7 @@ Then follow the flavor's section. Each ends with the URL, which is also the
 Nothing to set up on the VM: the exe.dev proxy already fronts port 8000 and
 signs users in.
 
-URL: `https://$VM.exe.xyz/`.
+URL: `https://$VM.exe.xyz`.
 
 ### tailscale flavor
 
@@ -75,7 +75,7 @@ ssh "$VM.exe.xyz" sudo tailscale serve --bg --https=443 unix:/run/miniflux/minif
 `set --auto-update` is a no-op if the tailnet's "Auto-update new devices" is
 on; see [Upgrade](#upgrade). State persists in `/var/lib/tailscale`.
 
-URL: `https://exeflux.<tailnet>.ts.net/`.
+URL: `https://exeflux.<tailnet>.ts.net`.
 
 Optional [Tailscale Service](https://tailscale.com/docs/features/tailscale-services)
 `svc:miniflux` (endpoint `tcp:443`) for a stable name across VMs:
@@ -89,7 +89,7 @@ Optional [Tailscale Service](https://tailscale.com/docs/features/tailscale-servi
 ssh "$VM.exe.xyz" sudo tailscale serve --service=svc:miniflux --https=443 unix:/run/miniflux/miniflux.sock
 ```
 
-URL (update `BASE_URL`): `https://miniflux.<tailnet>.ts.net/`.
+URL (update `BASE_URL`): `https://miniflux.<tailnet>.ts.net`.
 
 ## Configure
 
