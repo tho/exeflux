@@ -41,11 +41,20 @@ ssh "$VM.exe.xyz" sudo -u postgres psql miniflux \
   -c "UPDATE users SET is_admin = true WHERE username = LOWER('<login>')"
 ```
 
-Then set `BASE_URL` ([Configure](#configure)) and open the URL.
+Then follow the flavor's section. Each ends with the URL, which is also the
+`BASE_URL` to set ([Configure](#configure)) before opening it.
+
+### exe flavor
+
+Nothing to set up on the VM: the exe.dev proxy already fronts port 8000 and
+signs users in.
+
+URL: `https://$VM.exe.xyz/`.
 
 ### tailscale flavor
 
-HTTPS only; it needs MagicDNS and HTTPS certificates. Every flavor sets
+Tailscale Serve fronts the socket and the tailnet login becomes the Miniflux
+user. HTTPS only; it needs MagicDNS and HTTPS certificates. Every flavor sets
 `HTTPS=1` (Secure cookies, HSTS), so plain `--http` would never get its session
 cookie back, and browsers do not know that http over a tailnet is private.
 Policy:
@@ -64,9 +73,9 @@ ssh "$VM.exe.xyz" sudo tailscale serve --bg --https=443 unix:/run/miniflux/minif
 ```
 
 `set --auto-update` is a no-op if the tailnet's "Auto-update new devices" is
-on; see [Upgrade](#upgrade).
+on; see [Upgrade](#upgrade). State persists in `/var/lib/tailscale`.
 
-URL (set as `BASE_URL`): `https://exeflux.<tailnet>.ts.net/`. State persists in `/var/lib/tailscale`.
+URL: `https://exeflux.<tailnet>.ts.net/`.
 
 Optional [Tailscale Service](https://tailscale.com/docs/features/tailscale-services)
 `svc:miniflux` (endpoint `tcp:443`) for a stable name across VMs:
