@@ -6,8 +6,10 @@ on:
   # Build (but never publish) on PRs.
   pull_request:
     branches: [main]
-  # Weekly rebuild picks up Ubuntu security updates to the packages installed
-  # here (PostgreSQL, Tailscale's deps). The base is pinned in the Dockerfile.
+  # Weekly canary: the pinned inputs (base tag, Miniflux .deb, Tailscale
+  # version) must still be fetchable and the image must still boot. Publishes
+  # nothing: the VMs patch themselves (unattended-upgrades, Tailscale's
+  # auto-update), so a rebuild on the same pins would only move tags.
   schedule:
     - cron: '0 5 * * 1'
   workflow_dispatch:
@@ -38,8 +40,8 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # Only main publishes.
-      - if: github.ref == 'refs/heads/main'
+      # Only main publishes, and not from the weekly canary.
+      - if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -133,7 +135,7 @@ jobs:
           context: .
           target: ${{ matrix.flavor }}
           platforms: linux/amd64
-          push: ${{ github.ref == 'refs/heads/main' }}
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'schedule' }}
           # Override the source and version labels inherited from exeslim.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

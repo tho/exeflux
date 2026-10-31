@@ -59,8 +59,12 @@ Delete any old `exeflux` machine first to avoid `exeflux-1`. Use a one-off (non-
 
 ```sh
 ssh "$VM.exe.xyz" sudo tailscale up --hostname=exeflux --auth-key=<key>
+ssh "$VM.exe.xyz" sudo tailscale set --auto-update
 ssh "$VM.exe.xyz" sudo tailscale serve --bg --https=443 unix:/run/miniflux/miniflux.sock
 ```
+
+`set --auto-update` is a no-op if the tailnet's "Auto-update new devices" is
+on; see [Upgrade](#upgrade).
 
 URL (set as `BASE_URL`): `https://exeflux.<tailnet>.ts.net/`. State persists in `/var/lib/tailscale`.
 
@@ -151,11 +155,16 @@ rebuild. The VM is stateful, so move to a new one with
 
 Unlike exeslim, the VM patches itself: Ubuntu security updates install daily
 via `unattended-upgrades`, which reboots the VM right after any upgrade that
-needs it. Miniflux and Tailscale are not covered; they come from outside
-Ubuntu's security pocket. Check with:
+needs it. Miniflux is not covered (it is not an Ubuntu package); nor is
+Tailscale, which [updates itself](https://tailscale.com/kb/1067/update)
+instead when `tailscale set --auto-update` is on: Tailscale enables a release
+for auto-update about a week after shipping it, sooner for security fixes,
+and the client then installs it with `apt-get` from `pkgs.tailscale.com`. The
+`Dockerfile` pin is only a fresh VM's starting version. Check with:
 
 ```sh
 ssh "$VM.exe.xyz" sudo cat /var/log/unattended-upgrades/unattended-upgrades.log
+ssh "$VM.exe.xyz" tailscale version
 ```
 
 ## Build
@@ -168,4 +177,5 @@ curl -fsSL https://github.com/miniflux/v2/releases/download/<version>/miniflux_<
 
 CI builds, checks and boots both flavors as in
 [exeslim's recipe](https://github.com/tho/exeslim/blob/main/docs/deploying.md#checking-the-profile-in-ci),
-and pushes them to `ghcr.io/tho/exeflux` on push to `main` and weekly.
+and pushes them to `ghcr.io/tho/exeflux` on push to `main`. A weekly run
+publishes nothing; it proves the pinned inputs still build and boot.
