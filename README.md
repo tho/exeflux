@@ -11,7 +11,7 @@
 Users are created on first visit from the header; password login is disabled.
 The exe flavor trusts the header from any loopback client, so don't `share
 set-public`. The tailscale flavor listens on a socket that only root, and so
-tailscaled, can reach. PostgreSQL is reached over its socket with peer
+tailscaled, can reach. PostgreSQL listens only on its socket, with peer
 authentication.
 
 ## Deploy

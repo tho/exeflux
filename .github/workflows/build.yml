@@ -91,6 +91,7 @@ jobs:
             grep -qx RUN_MIGRATIONS=1 /etc/miniflux.conf
             grep -qE "^local +miniflux +miniflux +peer +map=svc$" /etc/postgresql/16/main/pg_hba.conf
             grep -qE "^svc +svc-miniflux +miniflux$" /etc/postgresql/16/main/pg_ident.conf
+            grep -qx "listen_addresses = ''" /etc/postgresql/16/main/conf.d/10-exeflux-socket-only.conf
             systemd-analyze verify svc-miniflux.service
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
             upgrade-miniflux "$(miniflux -version)" 2>&1 | grep -q "is not newer than the installed"
@@ -116,6 +117,8 @@ jobs:
           [[ " $dropins " == *" /etc/systemd/system/svc-.service.d/50-hardening.conf "* ]] ||
             { echo "svc-miniflux runs without exeslim's hardening drop-in: $dropins"; exit 1; }
           timeout 120 bash -c 'until [[ $(docker exec mf systemctl is-active svc-miniflux) == active ]]; do sleep 1; done'
+          listen=$(docker exec mf runuser -u postgres -- psql -tAc 'SHOW listen_addresses')
+          [[ -z $listen ]] || { echo "Postgres listens on TCP: $listen"; exit 1; }
           if [[ ${{ matrix.flavor }} == tailscale ]]; then
             sock=$(docker exec mf stat -c '%U:%G %a' /run/miniflux/miniflux.sock)
             [[ $sock == 'svc-miniflux:svc-miniflux 660' ]] || { echo "socket is wrong: $sock"; exit 1; }

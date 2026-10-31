@@ -38,9 +38,14 @@ RUN systemctl unmask apt-daily.timer apt-daily-upgrade.timer unattended-upgrades
 # miniflux -create-admin, -flush-sessions and upgrade-miniflux. No password,
 # and no other user can connect as miniflux. Inserted first: the stock
 # "local all all peer" line would otherwise match and fail without the map.
+# Socket only: listen_addresses='' drops the default loopback TCP listener,
+# which the tailscale flavor's userspace networking would otherwise expose to
+# tailnet peers. Nothing here speaks TCP to Postgres.
 RUN sed -i '1i local miniflux miniflux peer map=svc' /etc/postgresql/16/main/pg_hba.conf \
 	&& printf '%s\n' 'svc svc-miniflux miniflux' 'svc root miniflux' >>/etc/postgresql/16/main/pg_ident.conf \
+	&& echo "listen_addresses = ''" >/etc/postgresql/16/main/conf.d/10-exeflux-socket-only.conf \
 	&& pg_ctlcluster 16 main start \
+	&& [ -z "$(runuser -u postgres -- psql -tAc 'SHOW listen_addresses')" ] \
 	&& runuser -u postgres -- psql -v ON_ERROR_STOP=1 \
 		-c 'CREATE ROLE miniflux LOGIN' \
 		-c 'CREATE DATABASE miniflux OWNER miniflux' \
@@ -94,13 +99,10 @@ RUN . /etc/os-release \
 # root (tailscaled) reaches it: no port for the exe.dev proxy or a local process
 # to find. Miniflux reports a socket peer as 127.0.0.1.
 #
-# Userspace networking: tailscaled terminates WireGuard in its own network
-# stack, so it needs no TUN device and creates no interface, and local
-# processes get no route into the tailnet. Serve runs inside tailscaled and is
-# all this flavor uses. Note that netstack forwards a peer's connection to
-# <tailnet IP>:<port> onto 127.0.0.1:<port> (wgengine/netstack acceptTCP,
-# 1.104.4), so a loopback listener is reachable from the tailnet, ACLs
-# permitting; a Unix socket is not.
+# Userspace networking: no TUN device or interface, and the VM gets no route
+# into the tailnet. Serve runs inside tailscaled and is all this flavor uses.
+# Peers' connections to the node's ports land on 127.0.0.1, so no service may
+# listen on loopback TCP: Miniflux and Postgres are socket only.
 RUN printf '%s\n' \
 		'LISTEN_ADDR=/run/miniflux/miniflux.sock' \
 		'AUTH_PROXY_HEADER=Tailscale-User-Login' \
