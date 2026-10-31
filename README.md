@@ -122,7 +122,7 @@ ssh "$VM.exe.xyz" sudo -u postgres psql miniflux \
 Miniflux:
 
 ```sh
-ssh "$VM.exe.xyz" sudo upgrade-miniflux -b /root/miniflux.dump <version>
+ssh "$VM.exe.xyz" sudo upgrade-miniflux -b /root/miniflux.dump [-s <sha256>] <version>
 ```
 
 Read the [release notes](https://github.com/miniflux/v2/releases) for breaking
@@ -130,7 +130,8 @@ changes first. Follows [upstream's steps](https://miniflux.app/docs/upgrade.html
 stops `svc-miniflux`, flushes sessions (proxy auth signs users back in on their
 next request), dumps and checks the backup if `-b`, installs, starts.  Refuses
 downgrades, keeps `/etc/miniflux.conf`, returns once Miniflux reports ready.
-No rollback: on
+`-s` checks the download against a checksum from somewhere other than the
+download itself. No rollback: on
 failure check `journalctl -u svc-miniflux`; to revert, `dpkg -i --force-confold`
 the old `.deb`, then follow the restore steps in Backup and restore, replacing
 its `pg_restore` line with:

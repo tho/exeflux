@@ -2,16 +2,19 @@
 # upgrade-miniflux: stop Miniflux, flush its sessions, optionally back up the
 # database, install a release .deb in place and start it again.
 #
-# Usage: sudo upgrade-miniflux [-b backup-path] <version>
+# Usage: sudo upgrade-miniflux [-b backup-path] [-s sha256] <version>
 #   -b  pg_dump the database to backup-path first (custom format); if it is
 #       a directory, to miniflux.dump in it
+#   -s  check the downloaded .deb against this SHA-256. Get it from somewhere
+#       other than the download: the release page's checksums share its origin
+#       and would be changed along with it.
 
 set -euo pipefail
 
 readonly CONF=/etc/miniflux.conf
 
 usage() {
-	echo "usage: ${0##*/} [-b backup-path] <version>" >&2
+	echo "usage: ${0##*/} [-b backup-path] [-s sha256] <version>" >&2
 	exit 2
 }
 
@@ -22,9 +25,11 @@ die() {
 
 # Parse arguments.
 backup=""
-while getopts ":b:" opt; do
+sha256=""
+while getopts ":b:s:" opt; do
 	case $opt in
 		b) backup="$OPTARG" ;;
+		s) sha256="${OPTARG,,}" ;;
 		*) usage ;;
 	esac
 done
@@ -34,6 +39,8 @@ shift $((OPTIND - 1))
 version="$1"
 version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
 [[ $version =~ $version_re ]] || die "version must look like 2.3.3, got: $version"
+sha256_re='^[0-9a-f]{64}$'
+[[ -z $sha256 || $sha256 =~ $sha256_re ]] || die "sha256 must be 64 hex digits, got: $sha256"
 
 ((EUID == 0)) || die "run as root"
 
@@ -50,6 +57,10 @@ trap 'rm -rf -- "$tmp_dir"' EXIT
 
 deb="miniflux_${version}_$(dpkg --print-architecture).deb"
 curl -fsSLo "$tmp_dir/$deb" "https://github.com/miniflux/v2/releases/download/${version}/${deb}"
+if [[ -n $sha256 ]]; then
+	echo "$sha256  $tmp_dir/$deb" | sha256sum -c --status - ||
+		die "$deb does not match $sha256; nothing upgraded"
+fi
 
 # Stop, then flush sessions, per https://miniflux.app/docs/upgrade.html.
 # Stopping first means no writes land after the backup and no session is

@@ -73,7 +73,9 @@ jobs:
       # dbus's must still be the symlink to it, after our apt layers;
       # svc-miniflux (not miniflux) and unattended upgrades are enabled, and
       # svc-miniflux must still be covered by exeslim's svc- hardening drop-in
-      # (exposure <= 2.0, where a unit the drop-in misses scores ~9.4).
+      # (exposure <= 2.0, where a unit the drop-in misses scores ~9.4);
+      # upgrade-miniflux must refuse a downgrade and a malformed checksum
+      # before touching anything, each for the right reason.
       - name: Check the image
         run: |
           docker run --rm exeflux:ci bash -euc '
@@ -88,7 +90,8 @@ jobs:
             grep -qx RUN_MIGRATIONS=1 /etc/miniflux.conf
             systemd-analyze verify svc-miniflux.service
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
-            ! upgrade-miniflux "$(miniflux -version)"'
+            upgrade-miniflux "$(miniflux -version)" 2>&1 | grep -q "is not newer than the installed"
+            upgrade-miniflux -s nothex 9.9.9 2>&1 | grep -q "sha256 must be 64 hex digits"'
 
       # Boot it: after boot only the unit Docker cannot run may have failed,
       # the running svc-miniflux must carry exeslim's hardening drop-in, and
