@@ -74,7 +74,8 @@ jobs:
       # dbus's must still be the symlink to it, after our apt layers;
       # svc-miniflux (not miniflux), unattended upgrades and, in the tailscale
       # flavor, tailscaled in userspace mode are enabled; Postgres is socket
-      # only with the peer map in place; svc-miniflux must still be covered by
+      # only with the peer map in place (\x27: a literal quote would end the
+      # single-quoted script); svc-miniflux must still be covered by
       # exeslim's svc- hardening drop-in (exposure <= 2.0, where a unit the
       # drop-in misses scores ~9.4); upgrade-miniflux must refuse a downgrade
       # and a malformed checksum before touching anything, each for the right
@@ -94,7 +95,7 @@ jobs:
             grep -qx RUN_MIGRATIONS=1 /etc/miniflux.conf
             grep -qE "^local +miniflux +miniflux +peer +map=svc$" /etc/postgresql/16/main/pg_hba.conf
             grep -qE "^svc +svc-miniflux +miniflux$" /etc/postgresql/16/main/pg_ident.conf
-            grep -qx "listen_addresses = ''" /etc/postgresql/16/main/conf.d/10-exeflux-socket-only.conf
+            grep -qxP "listen_addresses = \x27\x27" /etc/postgresql/16/main/conf.d/10-exeflux-socket-only.conf
             systemd-analyze verify svc-miniflux.service
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
             upgrade-miniflux "$(miniflux -version)" 2>&1 | grep -q "is not newer than the installed"
