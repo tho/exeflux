@@ -142,8 +142,7 @@ It follows [upstream's steps](https://miniflux.app/docs/upgrade.html): stops
 request), dumps and checks the backup if `-b`, installs, starts, and returns
 once Miniflux reports ready. It refuses downgrades and keeps
 `/etc/miniflux.conf`. `-s` checks the download against a checksum from
-somewhere other than the download itself, such as the [Build](#build) command
-run locally. Bump the `Dockerfile` `ARG`s to match.
+somewhere other than the download itself.
 
 No rollback. On failure, check `journalctl -u svc-miniflux`. To revert,
 `dpkg -i --force-confold` the old `.deb`, then follow
