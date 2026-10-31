@@ -72,11 +72,13 @@ jobs:
 
       # machine-id must stay empty (present, or first boot presets units) and
       # dbus's must still be the symlink to it, after our apt layers;
-      # svc-miniflux (not miniflux) and unattended upgrades are enabled, and
-      # svc-miniflux must still be covered by exeslim's svc- hardening drop-in
-      # (exposure <= 2.0, where a unit the drop-in misses scores ~9.4);
-      # upgrade-miniflux must refuse a downgrade and a malformed checksum
-      # before touching anything, each for the right reason.
+      # svc-miniflux (not miniflux), unattended upgrades and, in the tailscale
+      # flavor, tailscaled in userspace mode are enabled; Postgres is socket
+      # only with the peer map in place; svc-miniflux must still be covered by
+      # exeslim's svc- hardening drop-in (exposure <= 2.0, where a unit the
+      # drop-in misses scores ~9.4); upgrade-miniflux must refuse a downgrade
+      # and a malformed checksum before touching anything, each for the right
+      # reason.
       - name: Check the image
         run: |
           docker run --rm exeflux:ci bash -euc '
@@ -102,9 +104,10 @@ jobs:
       # the running svc-miniflux must carry exeslim's hardening drop-in, and
       # it must have migrated and answer. Same recipe as exeslim's own CI.
       # Type=notify: active means Miniflux reported ready, after migrating over
-      # the Postgres socket with peer authentication. Then GET /healthcheck the
-      # way the proxy does: the port (exe) or the socket (tailscale), which
-      # must be the dynamic user's and 0660.
+      # the Postgres socket with peer authentication. The running Postgres must
+      # have no TCP listener. Then GET /healthcheck the way the proxy does: the
+      # port (exe) or the socket (tailscale), which must be the dynamic user's
+      # and 0660.
       - name: Boot the image
         run: |
           set -euo pipefail

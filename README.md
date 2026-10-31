@@ -54,17 +54,18 @@ URL: `https://$VM.exe.xyz`.
 ### tailscale flavor
 
 Tailscale Serve fronts the socket and the tailnet login becomes the Miniflux
-user. HTTPS only; it needs MagicDNS and HTTPS certificates. Every flavor sets
-`HTTPS=1` (Secure cookies, HSTS), so plain `--http` would never get its session
-cookie back, and browsers do not know that http over a tailnet is private.
-Policy:
+user. HTTPS only, which needs MagicDNS and HTTPS certificates: both flavors set
+`HTTPS=1` (Secure cookies, HSTS), so a session over plain `--http` never gets
+its cookie back, and a browser does not treat http as private just because it
+crosses a tailnet. Policy:
 
 ```jsonc
 "tagOwners": { "tag:miniflux": [] },
 "grants": [{ "src": ["<sources>"], "dst": ["tag:miniflux"], "ip": ["443"] }],
 ```
 
-Delete any old `exeflux` machine first to avoid `exeflux-1`. Use a one-off (non-reusable) auth key for `tag:miniflux`.
+Delete any old `exeflux` machine first to avoid `exeflux-1`. Use a
+non-reusable auth key for `tag:miniflux`.
 
 ```sh
 ssh "$VM.exe.xyz" sudo tailscale up --hostname=exeflux --auth-key=<key>
@@ -94,12 +95,12 @@ URL (update `BASE_URL`): `https://miniflux.<tailnet>.ts.net`.
 ## Configure
 
 `/etc/miniflux.conf` is the package's config file, read by `svc-miniflux` and
-by `miniflux -config-file`. The image appends the proxy-auth, media-proxy and
-polling settings (see the [`Dockerfile`](Dockerfile)); each flavor adds its
-listen address and header. Per VM, append what differs and restart:
+by `miniflux -config-file`. The image appends its settings (see the
+[`Dockerfile`](Dockerfile)); each flavor adds its listen address and header.
+Per VM, append what differs and restart:
 
 ```sh
-ssh "$VM.exe.xyz" 'echo BASE_URL=<proto>://<url> | sudo tee -a /etc/miniflux.conf'
+ssh "$VM.exe.xyz" 'echo BASE_URL=<url> | sudo tee -a /etc/miniflux.conf'
 ssh "$VM.exe.xyz" sudo systemctl restart svc-miniflux
 ```
 
@@ -127,42 +128,49 @@ ssh "$VM.exe.xyz" sudo systemctl start svc-miniflux
 
 ## Upgrade
 
-Miniflux:
+### Miniflux
+
+Read the [release notes](https://github.com/miniflux/v2/releases) for breaking
+changes, then:
 
 ```sh
 ssh "$VM.exe.xyz" sudo upgrade-miniflux -b /root/miniflux.dump [-s <sha256>] <version>
 ```
 
-Read the [release notes](https://github.com/miniflux/v2/releases) for breaking
-changes first. Follows [upstream's steps](https://miniflux.app/docs/upgrade.html):
-stops `svc-miniflux`, flushes sessions (proxy auth signs users back in on their
-next request), dumps and checks the backup if `-b`, installs, starts.  Refuses
-downgrades, keeps `/etc/miniflux.conf`, returns once Miniflux reports ready.
-`-s` checks the download against a checksum from somewhere other than the
-download itself. No rollback: on
-failure check `journalctl -u svc-miniflux`; to revert, `dpkg -i --force-confold`
-the old `.deb`, then follow the restore steps in Backup and restore, replacing
-its `pg_restore` line with:
+It follows [upstream's steps](https://miniflux.app/docs/upgrade.html): stops
+`svc-miniflux`, flushes sessions (proxy auth signs users back in on their next
+request), dumps and checks the backup if `-b`, installs, starts, and returns
+once Miniflux reports ready. It refuses downgrades and keeps
+`/etc/miniflux.conf`. `-s` checks the download against a checksum from
+somewhere other than the download itself, such as the [Build](#build) command
+run locally. Bump the `Dockerfile` `ARG`s to match.
+
+No rollback. On failure, check `journalctl -u svc-miniflux`. To revert,
+`dpkg -i --force-confold` the old `.deb`, then follow
+[Backup and restore](#backup-and-restore) with this in place of its
+`pg_restore` line:
 
 ```sh
 ssh "$VM.exe.xyz" 'sudo cat /root/miniflux.dump | sudo -u postgres pg_restore -e -d miniflux'
 ```
 
-Bump the `Dockerfile` `ARG`s to match.
+### Base image
 
-The base: bump `BASE` in the `Dockerfile` to a newer exeslim build id and
-rebuild. The VM is stateful, so move to a new one with
-[Backup and restore](#backup-and-restore) rather than replacing it in place
+Bump `BASE` in the `Dockerfile` to a newer exeslim build id and rebuild. The VM
+is stateful, so move to a new one with [Backup and restore](#backup-and-restore)
+rather than replacing it in place
 ([exeslim: deploying and updating](https://github.com/tho/exeslim/blob/main/docs/deploying.md#deploying-and-updating)).
 
-Unlike exeslim, the VM patches itself: Ubuntu security updates install daily
-via `unattended-upgrades`, which reboots the VM right after any upgrade that
-needs it. Miniflux is not covered (it is not an Ubuntu package); nor is
-Tailscale, which [updates itself](https://tailscale.com/kb/1067/update)
-instead when `tailscale set --auto-update` is on: Tailscale enables a release
-for auto-update about a week after shipping it, sooner for security fixes,
-and the client then installs it with `apt-get` from `pkgs.tailscale.com`. The
-`Dockerfile` pin is only a fresh VM's starting version. Check with:
+### Ubuntu and Tailscale
+
+Unlike exeslim, the VM patches itself: `unattended-upgrades` installs Ubuntu
+security updates daily and reboots right after any upgrade that needs it.
+Miniflux is not an Ubuntu package, so it is not covered. Neither is Tailscale,
+which [updates itself](https://tailscale.com/kb/1067/update) when
+`tailscale set --auto-update` is on: Tailscale enables a release for
+auto-update about a week after shipping it, sooner for security fixes, and the
+client installs it with `apt-get` from `pkgs.tailscale.com`. The `Dockerfile`
+pin is only a fresh VM's starting version. Check with:
 
 ```sh
 ssh "$VM.exe.xyz" sudo cat /var/log/unattended-upgrades/unattended-upgrades.log
@@ -175,6 +183,7 @@ ssh "$VM.exe.xyz" tailscale version
 docker build --target exe -t exeflux:exe .
 docker build --target tailscale -t exeflux:tailscale .
 curl -fsSL https://github.com/miniflux/v2/releases/download/<version>/miniflux_<version>_amd64.deb | sha256sum  # MINIFLUX_SHA256
+curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg | sha256sum  # TAILSCALE_KEY_SHA256
 ```
 
 CI builds, checks and boots both flavors as in
