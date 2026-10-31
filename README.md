@@ -125,13 +125,6 @@ ssh "$VM.exe.xyz" sudo -u postgres pg_restore -e -d miniflux <miniflux.dump
 ssh "$VM.exe.xyz" sudo systemctl start svc-miniflux
 ```
 
-Across flavors, rename the user before the first visit:
-
-```sh
-ssh "$VM.exe.xyz" sudo -u postgres psql miniflux \
-  -c "UPDATE users SET username = LOWER('<new>') WHERE username = LOWER('<old>')"
-```
-
 ## Upgrade
 
 Miniflux:
