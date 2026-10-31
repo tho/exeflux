@@ -32,6 +32,10 @@ RUN systemctl unmask apt-daily.timer apt-daily-upgrade.timer unattended-upgrades
 	&& echo 'Unattended-Upgrade::Automatic-Reboot "true";' >/etc/apt/apt.conf.d/52exeflux-reboot \
 	&& rm /etc/apt/apt.conf.d/docker-disable-periodic-update
 
+# Trust the miniflux role over loopback: the only other things on this VM that
+# can reach 127.0.0.1 run as root or as exedev, who has sudo, so a password
+# would guard nothing. TCP rather than a socket because exeslim's hardening
+# profile allows the service no Unix sockets.
 RUN sed -i '1i host miniflux miniflux 127.0.0.1/32 trust' /etc/postgresql/16/main/pg_hba.conf \
 	&& pg_ctlcluster 16 main start \
 	&& runuser -u postgres -- psql -v ON_ERROR_STOP=1 \
