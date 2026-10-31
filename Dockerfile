@@ -8,8 +8,8 @@ ARG BASE=ghcr.io/tho/exeslim:2026-10-31.17.1
 FROM ${BASE} AS common
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
-ARG MINIFLUX_VERSION=2.3.3
-ARG MINIFLUX_SHA256=14712f3852a7e6716676b9a827597febf098da9ae926b3ca82b594ad3d16e759
+ARG MINIFLUX_VERSION=2.3.4
+ARG MINIFLUX_SHA256=3b681ef32f55acb51fecfc87219bfd658a0ee5b9cd49dd26e8e0023363f9dfe2
 
 RUN curl -fsSLo /tmp/miniflux.deb \
 		"https://github.com/miniflux/v2/releases/download/${MINIFLUX_VERSION}/miniflux_${MINIFLUX_VERSION}_amd64.deb" \
@@ -74,7 +74,7 @@ LABEL org.opencontainers.image.title="exeflux" \
 
 FROM common AS tailscale
 
-ARG TAILSCALE_VERSION=1.104.1
+ARG TAILSCALE_VERSION=1.104.4
 ARG TAILSCALE_KEY_SHA256=3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39
 
 RUN . /etc/os-release \
