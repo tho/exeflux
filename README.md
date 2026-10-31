@@ -3,14 +3,16 @@
 [Miniflux](https://miniflux.app) + PostgreSQL 16 on
 [exeslim](https://github.com/tho/exeslim). Two flavors from one `Dockerfile`:
 
-| Flavor      | Listens on        | Reached via                    | Auth header            |
-|-------------|-------------------|--------------------------------|------------------------|
-| `exe`       | `127.0.0.1:8000`  | `https://$VM.exe.xyz/`         | `X-ExeDev-Email`       |
-| `tailscale` | `127.0.0.1:10000` | Tailscale Serve                | `Tailscale-User-Login` |
+| Flavor      | Listens on                    | Reached via            | Auth header            |
+|-------------|-------------------------------|------------------------|------------------------|
+| `exe`       | `127.0.0.1:8000`              | `https://$VM.exe.xyz/` | `X-ExeDev-Email`       |
+| `tailscale` | `/run/miniflux/miniflux.sock` | Tailscale Serve        | `Tailscale-User-Login` |
 
 Users are created on first visit from the header; password login is disabled.
-Miniflux trusts the header from any loopback client, so don't `share
-set-public` (exe) or `share port` (tailscale).
+The exe flavor trusts the header from any loopback client, so don't `share
+set-public`. The tailscale flavor listens on a socket that only root, and so
+tailscaled, can reach. PostgreSQL is reached over its socket with peer
+authentication.
 
 ## Deploy
 
@@ -21,7 +23,7 @@ moving `latest-`, `<date>-` and `<sha>-` tags are as for
 
 ```sh
 ssh exe.dev new --name="$VM" --image=ghcr.io/tho/exeflux:<build-id>-<flavor>
-ssh "$VM.exe.xyz" sudo miniflux -config-file /etc/miniflux.conf -healthcheck auto
+ssh "$VM.exe.xyz" systemctl is-active svc-miniflux
 ```
 
 Create the admin **before the first visit** (a visit creates a non-admin and
@@ -57,7 +59,7 @@ Delete any old `exeflux` machine first to avoid `exeflux-1`. Use a one-off (non-
 
 ```sh
 ssh "$VM.exe.xyz" sudo tailscale up --hostname=exeflux --auth-key=<key>
-ssh "$VM.exe.xyz" sudo tailscale serve --bg --https=443 127.0.0.1:10000
+ssh "$VM.exe.xyz" sudo tailscale serve --bg --https=443 unix:/run/miniflux/miniflux.sock
 ```
 
 URL (set as `BASE_URL`): `https://exeflux.<tailnet>.ts.net/`. State persists in `/var/lib/tailscale`.
@@ -71,7 +73,7 @@ Optional [Tailscale Service](https://tailscale.com/docs/features/tailscale-servi
 ```
 
 ```sh
-ssh "$VM.exe.xyz" sudo tailscale serve --service=svc:miniflux --https=443 127.0.0.1:10000
+ssh "$VM.exe.xyz" sudo tailscale serve --service=svc:miniflux --https=443 unix:/run/miniflux/miniflux.sock
 ```
 
 URL (update `BASE_URL`): `https://miniflux.<tailnet>.ts.net/`.

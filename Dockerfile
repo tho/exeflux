@@ -4,7 +4,7 @@
 #   docker build --target tailscale -t exeflux:tailscale .
 
 # Immutable <date>.<run>.<attempt> tag; exeslim's <date> tag moves.
-ARG BASE=ghcr.io/tho/exeslim:2026-10-31.16.1
+ARG BASE=ghcr.io/tho/exeslim:2026-10-31.17.1
 FROM ${BASE} AS common
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
@@ -32,11 +32,14 @@ RUN systemctl unmask apt-daily.timer apt-daily-upgrade.timer unattended-upgrades
 	&& echo 'Unattended-Upgrade::Automatic-Reboot "true";' >/etc/apt/apt.conf.d/52exeflux-reboot \
 	&& rm /etc/apt/apt.conf.d/docker-disable-periodic-update
 
-# Trust the miniflux role over loopback: the only other things on this VM that
-# can reach 127.0.0.1 run as root or as exedev, who has sudo, so a password
-# would guard nothing. TCP rather than a socket because exeslim's hardening
-# profile allows the service no Unix sockets.
-RUN sed -i '1i host miniflux miniflux 127.0.0.1/32 trust' /etc/postgresql/16/main/pg_hba.conf \
+# Postgres over its socket with peer authentication: the kernel reports the
+# connecting UID, nss-systemd names it svc-miniflux (the unit's dynamic user),
+# and pg_ident maps that name to the miniflux role. root is mapped too, for
+# miniflux -create-admin, -flush-sessions and upgrade-miniflux. No password,
+# and no other user can connect as miniflux. Inserted first: the stock
+# "local all all peer" line would otherwise match and fail without the map.
+RUN sed -i '1i local miniflux miniflux peer map=svc' /etc/postgresql/16/main/pg_hba.conf \
+	&& printf '%s\n' 'svc svc-miniflux miniflux' 'svc root miniflux' >>/etc/postgresql/16/main/pg_ident.conf \
 	&& pg_ctlcluster 16 main start \
 	&& runuser -u postgres -- psql -v ON_ERROR_STOP=1 \
 		-c 'CREATE ROLE miniflux LOGIN' \
@@ -44,7 +47,7 @@ RUN sed -i '1i host miniflux miniflux 127.0.0.1/32 trust' /etc/postgresql/16/mai
 	&& pg_ctlcluster 16 main stop
 
 RUN printf '%s\n' \
-		'DATABASE_URL=postgres://miniflux@127.0.0.1/miniflux?sslmode=disable' \
+		'DATABASE_URL=postgres://miniflux@/miniflux?host=/var/run/postgresql&sslmode=disable' \
 		'AUTH_PROXY_USER_CREATION=1' \
 		'DISABLE_LOCAL_AUTH=1' \
 		'HTTPS=1' \
@@ -87,9 +90,11 @@ RUN . /etc/os-release \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& : >/etc/machine-id
 
-# 10000 is outside the 3000 to 9999 range the exe.dev proxy forwards.
+# A socket in the unit's RuntimeDirectory=, 0660 to the dynamic user, so only
+# root (tailscaled) reaches it: no port for the exe.dev proxy or a local process
+# to find. Miniflux reports a socket peer as 127.0.0.1.
 RUN printf '%s\n' \
-		'LISTEN_ADDR=127.0.0.1:10000' \
+		'LISTEN_ADDR=/run/miniflux/miniflux.sock' \
 		'AUTH_PROXY_HEADER=Tailscale-User-Login' \
 		'TRUSTED_REVERSE_PROXY_NETWORKS=127.0.0.1/32' >>/etc/miniflux.conf \
 	&& sed -i 's/^FLAGS=.*/FLAGS="--tun=userspace-networking"/' /etc/default/tailscaled \

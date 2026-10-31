@@ -88,6 +88,8 @@ jobs:
             ! apt-config dump | grep -q "^APT::Periodic::Enable \"0\";"
             [[ -x /usr/share/update-notifier/notify-reboot-required ]]
             grep -qx RUN_MIGRATIONS=1 /etc/miniflux.conf
+            grep -qE "^local +miniflux +miniflux +peer +map=svc$" /etc/postgresql/16/main/pg_hba.conf
+            grep -qE "^svc +svc-miniflux +miniflux$" /etc/postgresql/16/main/pg_ident.conf
             systemd-analyze verify svc-miniflux.service
             systemd-analyze security --offline=true --threshold=20 svc-miniflux.service
             upgrade-miniflux "$(miniflux -version)" 2>&1 | grep -q "is not newer than the installed"
@@ -96,6 +98,10 @@ jobs:
       # Boot it: after boot only the unit Docker cannot run may have failed,
       # the running svc-miniflux must carry exeslim's hardening drop-in, and
       # it must have migrated and answer. Same recipe as exeslim's own CI.
+      # Type=notify: active means Miniflux reported ready, after migrating over
+      # the Postgres socket with peer authentication. Then GET /healthcheck the
+      # way the proxy does: the port (exe) or the socket (tailscale), which
+      # must be the dynamic user's and 0660.
       - name: Boot the image
         run: |
           set -euo pipefail
@@ -108,7 +114,14 @@ jobs:
           dropins=$(docker exec mf systemctl show --property=DropInPaths --value svc-miniflux.service)
           [[ " $dropins " == *" /etc/systemd/system/svc-.service.d/50-hardening.conf "* ]] ||
             { echo "svc-miniflux runs without exeslim's hardening drop-in: $dropins"; exit 1; }
-          timeout 60 bash -c 'until docker exec mf miniflux -config-file /etc/miniflux.conf -healthcheck auto; do sleep 1; done'
+          timeout 120 bash -c 'until [[ $(docker exec mf systemctl is-active svc-miniflux) == active ]]; do sleep 1; done'
+          if [[ ${{ matrix.flavor }} == tailscale ]]; then
+            sock=$(docker exec mf stat -c '%U:%G %a' /run/miniflux/miniflux.sock)
+            [[ $sock == 'svc-miniflux:svc-miniflux 660' ]] || { echo "socket is wrong: $sock"; exit 1; }
+            docker exec mf curl -fsS --unix-socket /run/miniflux/miniflux.sock http://localhost/healthcheck
+          else
+            docker exec mf curl -fsS http://127.0.0.1:8000/healthcheck
+          fi
 
       - if: failure()
         run: |

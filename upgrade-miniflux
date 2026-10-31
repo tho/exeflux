@@ -23,6 +23,18 @@ die() {
 	exit 1
 }
 
+# GET /healthcheck wherever LISTEN_ADDR points, a socket path or host:port.
+# miniflux -healthcheck auto cannot reach a socket.
+healthcheck() {
+	local addr
+	addr="$(sed -n 's/^LISTEN_ADDR=//p' "$CONF" | tail -n1)"
+	if [[ $addr == /* ]]; then
+		curl -fsSo /dev/null --unix-socket "$addr" http://localhost/healthcheck
+	else
+		curl -fsSo /dev/null "http://${addr}/healthcheck"
+	fi
+}
+
 # Parse arguments.
 backup=""
 sha256=""
@@ -91,5 +103,5 @@ fi
 # Miniflux reports ready, or fails within systemd's start timeout.
 dpkg -i --force-confold "$tmp_dir/$deb"
 systemctl start svc-miniflux || die "svc-miniflux did not start; see: journalctl -u svc-miniflux"
-miniflux -config-file "$CONF" -healthcheck auto >/dev/null
+healthcheck
 echo "Miniflux $(miniflux -version) is up"
