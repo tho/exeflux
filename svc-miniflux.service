@@ -9,6 +9,9 @@ After=postgresql.service
 
 [Service]
 ExecStart=/usr/bin/miniflux
+# Miniflux sends READY=1 once migrations have run and it is serving, so
+# start and restart return only then, or fail.
+Type=notify
 # The package's config file, shared with `miniflux -config-file`.
 EnvironmentFile=/etc/miniflux.conf
 
