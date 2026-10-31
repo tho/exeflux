@@ -84,6 +84,7 @@ jobs:
             [[ $(systemctl is-enabled miniflux.service) == disabled ]]
             systemctl is-enabled svc-miniflux.service
             [[ ${{ matrix.flavor }} != tailscale ]] || systemctl is-enabled tailscaled.service
+            [[ ${{ matrix.flavor }} != tailscale ]] || grep -qx "FLAGS=\"--tun=userspace-networking\"" /etc/default/tailscaled
             systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service
             apt-config dump | grep -qx "Unattended-Upgrade::Automatic-Reboot \"true\";"
             ! apt-config dump | grep -q "^APT::Periodic::Enable \"0\";"

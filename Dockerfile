@@ -45,7 +45,6 @@ RUN sed -i '1i local miniflux miniflux peer map=svc' /etc/postgresql/16/main/pg_
 	&& printf '%s\n' 'svc svc-miniflux miniflux' 'svc root miniflux' >>/etc/postgresql/16/main/pg_ident.conf \
 	&& echo "listen_addresses = ''" >/etc/postgresql/16/main/conf.d/10-exeflux-socket-only.conf \
 	&& pg_ctlcluster 16 main start \
-	&& [ -z "$(runuser -u postgres -- psql -tAc 'SHOW listen_addresses')" ] \
 	&& runuser -u postgres -- psql -v ON_ERROR_STOP=1 \
 		-c 'CREATE ROLE miniflux LOGIN' \
 		-c 'CREATE DATABASE miniflux OWNER miniflux' \
@@ -108,7 +107,6 @@ RUN printf '%s\n' \
 		'AUTH_PROXY_HEADER=Tailscale-User-Login' \
 		'TRUSTED_REVERSE_PROXY_NETWORKS=127.0.0.1/32' >>/etc/miniflux.conf \
 	&& sed -i 's/^FLAGS=.*/FLAGS="--tun=userspace-networking"/' /etc/default/tailscaled \
-	&& grep -qx 'FLAGS="--tun=userspace-networking"' /etc/default/tailscaled \
 	&& systemctl enable tailscaled.service
 
 LABEL org.opencontainers.image.title="exeflux" \
