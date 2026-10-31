@@ -93,6 +93,14 @@ RUN . /etc/os-release \
 # A socket in the unit's RuntimeDirectory=, 0660 to the dynamic user, so only
 # root (tailscaled) reaches it: no port for the exe.dev proxy or a local process
 # to find. Miniflux reports a socket peer as 127.0.0.1.
+#
+# Userspace networking: tailscaled terminates WireGuard in its own network
+# stack, so it needs no TUN device and creates no interface, and local
+# processes get no route into the tailnet. Serve runs inside tailscaled and is
+# all this flavor uses. Note that netstack forwards a peer's connection to
+# <tailnet IP>:<port> onto 127.0.0.1:<port> (wgengine/netstack acceptTCP,
+# 1.104.4), so a loopback listener is reachable from the tailnet, ACLs
+# permitting; a Unix socket is not.
 RUN printf '%s\n' \
 		'LISTEN_ADDR=/run/miniflux/miniflux.sock' \
 		'AUTH_PROXY_HEADER=Tailscale-User-Login' \
