@@ -8,8 +8,8 @@ ARG BASE=ghcr.io/tho/exeslim:2026-10-31.17.1
 FROM ${BASE} AS common
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
-ARG MINIFLUX_VERSION=2.3.4
-ARG MINIFLUX_SHA256=3b681ef32f55acb51fecfc87219bfd658a0ee5b9cd49dd26e8e0023363f9dfe2
+ARG MINIFLUX_VERSION=2.3.5
+ARG MINIFLUX_SHA256=c273431e39260635dd3217cc7c5c467e2ffa02bb607c00d0bd8814c50e7010e8
 
 RUN curl -fsSLo /tmp/miniflux.deb \
 		"https://github.com/miniflux/v2/releases/download/${MINIFLUX_VERSION}/miniflux_${MINIFLUX_VERSION}_amd64.deb" \
