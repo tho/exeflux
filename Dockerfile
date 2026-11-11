@@ -78,7 +78,7 @@ LABEL org.opencontainers.image.title="exeflux" \
 
 FROM common AS tailscale
 
-ARG TAILSCALE_VERSION=1.104.4
+ARG TAILSCALE_VERSION=1.104.6
 ARG TAILSCALE_KEY_SHA256=3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39
 
 RUN . /etc/os-release \
